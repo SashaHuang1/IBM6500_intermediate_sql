@@ -1,0 +1,212 @@
+---
+title: "Intermediate SQL: Learning Report"
+subtitle: "DataCamp Course Completion and Applied SQL Practice"
+author: "Yushan Huang"
+date: "2026-10-30"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+    code-fold: false
+    embed-resources: true
+execute:
+  enabled: false
+---
+
+## Course Completion
+
+I successfully completed DataCamp's **Intermediate SQL** course on **October 30, 2026**. The course covered data aggregation, grouping, filtering, conditional transformations, and techniques for producing actionable summaries from raw data.
+
+![DataCamp Intermediate SQL statement of accomplishment](intermediate-sql-certificate.png){width=90%}
+
+**Certificate number:** 674,093  
+**Certificate recipient:** yushanhuang
+
+## 1. Data Aggregation and Summary Values
+
+**Main ideas:** `SUM()`, `AVG()`, `MIN()`, `COUNT()`, and `COUNT(DISTINCT ...)` summarize datasets. Aggregation helps analysts move from individual transactions to performance indicators.
+
+```sql
+SELECT
+    COUNT(*) AS total_trips,
+    COUNT(DISTINCT rider_id) AS unique_riders,
+    COUNT(DISTINCT driver_id) AS unique_drivers,
+    SUM(fare) AS total_fare,
+    AVG(fare) AS average_fare
+FROM trips;
+```
+
+**Explanation:** The query produces five high-level metrics in a single result row. Distinct counts prevent repeated riders or drivers from being counted more than once.
+
+**Marketing application:** The same approach can summarize campaign conversions, unique customers, total sales, and average order value.
+
+## 2. GROUP BY and ORDER BY
+
+**Main ideas:** `GROUP BY` calculates metrics for each segment, while `ORDER BY` ranks or organizes the results. Grouping by multiple columns provides more granular comparisons.
+
+```sql
+SELECT
+    city,
+    ride_type,
+    AVG(fare) AS avg_fare,
+    COUNT(*) AS trip_count
+FROM trips
+GROUP BY city, ride_type
+ORDER BY city ASC, avg_fare DESC;
+```
+
+**Explanation:** Each row represents one city-and-ride-type combination. Results are sorted by city and then by descending average fare within each city.
+
+**Marketing application:** Group by acquisition channel and customer segment to identify which combinations produce higher average revenue. Small groups require cautious interpretation.
+
+## 3. Calculated Columns and Ratios
+
+**Main ideas:** Arithmetic expressions create new metrics; `NULLIF()` prevents division-by-zero errors. Ratios should be interpreted with their denominators in mind.
+
+```sql
+SELECT *,
+       sell_price / NULLIF(avg_buy_price, 0) AS return_multiple,
+       100.0 * (sell_price - avg_buy_price)
+           / NULLIF(avg_buy_price, 0) AS price_change_ratio
+FROM trades;
+```
+
+**Explanation:** The query retains the original columns while adding return measures. If `avg_buy_price` is zero, the denominator becomes `NULL` instead of causing a division-by-zero error.
+
+**Marketing application:** Similar calculations support conversion rates, return on ad spend, and percentage changes in performance. A high rate from very few observations may be unstable.
+
+## 4. Filtering Data with WHERE
+
+**Main ideas:** `WHERE` selects rows before aggregation. Comparison operators, `AND`, `OR`, `IN`, `LIKE`, and `IS NULL` support precise filters.
+
+```sql
+SELECT company, rank_2025, sector, state, profit, market_cap
+FROM fortune_50
+WHERE sector = 'Technology'
+  AND state != 'CA';
+```
+
+**Explanation:** Only technology companies headquartered outside California appear. Both conditions must be true.
+
+```sql
+SELECT company, rank_2025, rank_2024, rank_change
+FROM fortune_50
+WHERE rank_change > 10 OR rank_change < -10;
+```
+
+**Explanation:** `OR` captures rank changes exceeding ten positions in either direction.
+
+**Marketing application:** Filter for target audiences, geographic markets, or underperforming products before calculating KPIs.
+
+## 5. Conditional Transformations with CASE WHEN
+
+**Main ideas:** `CASE WHEN` classifies records into meaningful categories. SQL checks conditions in order and uses the first matching branch.
+
+```sql
+WITH flights_occupancy AS (
+    SELECT *,
+           100.0 * passengers / NULLIF(total_seats, 0) AS occupancy
+    FROM flights
+),
+flights_status AS (
+    SELECT *,
+           CASE
+               WHEN occupancy >= 90 THEN 'full'
+               WHEN occupancy >= 70 THEN 'high'
+               ELSE 'low'
+           END AS occupancy_status
+    FROM flights_occupancy
+)
+SELECT
+    occupancy_status,
+    COUNT(*) AS flight_count,
+    ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 2)
+        AS flight_percentage
+FROM flights_status
+GROUP BY occupancy_status;
+```
+
+**Explanation:** A first CTE calculates occupancy, a second creates occupancy categories, and the final query summarizes counts and percentages. Checking 90% before 70% ensures the categories do not overlap incorrectly.
+
+**Marketing application:** Categorize customers by engagement, campaign performance, or purchase frequency.
+
+## 6. Filtering Aggregated Results with HAVING
+
+**Main ideas:** `WHERE` filters individual rows before grouping, while `HAVING` filters grouped results after aggregation.
+
+```sql
+SELECT
+    plane_type,
+    COUNT(flight_id) AS flight_count,
+    COUNT(DISTINCT airline) AS airline_count,
+    AVG(distance) AS avg_distance
+FROM flights
+WHERE flight_status != 'canceled'
+GROUP BY plane_type
+HAVING COUNT(flight_id) > 100;
+```
+
+**Explanation:** Canceled flights are excluded first; then only plane types with more than 100 remaining flights are retained.
+
+**Marketing application:** Compare campaign segments only when they meet a minimum sample-size threshold.
+
+## 7. Conditional Aggregation
+
+**Main ideas:** Placing `CASE WHEN` inside an aggregate function measures a subset while preserving the broader group for other metrics.
+
+```sql
+SELECT
+    plane_type,
+    COUNT(flight_id) AS flight_count,
+    COUNT(CASE WHEN distance > 3000 THEN flight_id END)
+        AS flight_count_longhaul,
+    AVG(distance) AS avg_distance,
+    AVG(CASE WHEN distance > 3000 THEN distance END)
+        AS avg_distance_longhaul,
+    SUM(CASE WHEN distance > 3000 THEN passengers ELSE 0 END)
+        AS passengers_longhaul
+FROM flights
+WHERE flight_status != 'canceled'
+GROUP BY plane_type;
+```
+
+**Explanation:** The query compares all non-canceled flights with the long-haul subset, including flight counts, distance, and passenger totals.
+
+**Marketing application:** Calculate overall conversion rates alongside conversion rates for specific customer groups or campaign conditions.
+
+## 8. Final Integrated Exercise
+
+The final exercise combined filtering, grouping, conditional aggregation, and a minimum group-size requirement.
+
+```sql
+SELECT
+    airline,
+    COUNT(flight_id) AS total_flights,
+    COUNT(CASE WHEN distance > 3000 THEN flight_id END)
+        AS longhaul_flights,
+    AVG(fuel_efficiency) AS avg_fuel_efficiency,
+    AVG(CASE WHEN distance > 3000 THEN fuel_efficiency END)
+        AS avg_fuel_efficiency_longhaul
+FROM flights
+WHERE total_seats >= 300
+GROUP BY airline
+HAVING COUNT(flight_id) >= 50;
+```
+
+**Explanation:** This compares fuel-efficiency metrics for widebody aircraft by airline and retains airlines with at least 50 qualifying flights. The fuel-efficiency column name should match the course dataset.
+
+## Reflection
+
+This course strengthened my ability to transform raw records into interpretable business metrics. I learned the importance of SQL's logical processing order, especially the distinction between `WHERE` and `HAVING`, and how `CASE WHEN` supports segment-specific calculations. I also became more careful about data quality and interpretation: a metric can be mathematically correct but misleading when the denominator is small, units are inconsistent, or a comparison group is not defined clearly.
+
+For my marketing analytics work and course projects, I can use these techniques to measure revenue, customer behavior, campaign effectiveness, and performance across segments. The most useful takeaway is not simply writing SQL syntax, but designing queries that answer a business question accurately.
+
+
+
+
+- **GitHub repository:** [Add repository URL](https://github.com/)
+- **Intermediate SQL HTML report:** [Add published report URL](https://github.com/)
+- **Portfolio homepage:** [Add portfolio homepage URL](https://github.com/)
+
+
